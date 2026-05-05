@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Block Dash — Teacher Reference</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0d0d1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Press Start 2P', monospace;
+      color: #fff;
+    }
+
+    h1 {
+      color: #ff4d6d;
+      font-size: 1.6em;
+      margin-bottom: 8px;
+      text-shadow: 0 0 20px rgba(255,77,109,0.6);
+      letter-spacing: 2px;
+    }
+
+    #hud {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 8px;
+      font-size: 0.6em;
+      color: #ffd700;
+    }
+
+    canvas {
+      display: block;
+      border: 3px solid #ff4d6d;
+      border-radius: 6px;
+      box-shadow: 0 0 30px rgba(255,77,109,0.4);
+    }
+
+    #info {
+      margin-top: 10px;
+      font-size: 0.45em;
+      color: #7eb8f7;
+      letter-spacing: 1px;
+    }
+
+    /* Teacher note badge */
+    #teacher-badge {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #ffd700;
+      color: #000;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.45em;
+      padding: 6px 10px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="teacher-badge">📋 TEACHER COPY</div>
+
+  <h1>⬛ BLOCK DASH</h1>
+  <div id="hud">
+    <span>SCORE: <span id="score">0</span></span>
+    <span>BEST: <span id="best">0</span></span>
+  </div>
+  <canvas id="gameCanvas" width="720" height="280"></canvas>
+  <div id="info">SPACE or CLICK to jump &nbsp;|&nbsp; Double jump allowed!</div>
+
+  <script>
+    // ============================================================
+    //  GAME CONFIGURATION — These are the values students will set
+    // ============================================================
+
+    const GRAVITY    = 0.55;   // How fast the player falls   (0.3 – 1.0)
+    const JUMP_FORCE = -12;    // Jump power, MUST be negative (-8 to -15)
+    const GAME_SPEED = 5;      // Obstacle speed              (3 – 8)
+
+    // ============================================================
+    //  CORE GAME — No edits needed below this line
+    // ============================================================
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx    = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const bestEl  = document.getElementById('best');
+
+    const GROUND_Y = canvas.height - 55;
+    let score = 0, bestScore = 0, gameOver = false, started = false;
+    let frames = 0, spawnTimer = 0, spawnInterval = 110;
+
+    // ---- Player ----
+    const player = {
+      x: 90, y: GROUND_Y - 40,
+      w: 38, h: 38,
+      velY: 0,
+      jumpsLeft: 2,
+      rot: 0,
+
+      reset() {
+        this.y = GROUND_Y - this.h;
+        this.velY = 0;
+        this.jumpsLeft = 2;
+        this.rot = 0;
+      },
+
+      update() {
+        this.velY += GRAVITY;
+        this.y += this.velY;
+        if (this.y >= GROUND_Y - this.h) {
+          this.y = GROUND_Y - this.h;
+          this.velY = 0;
+          this.jumpsLeft = 2;
+        }
+        if (this.y < GROUND_Y - this.h) this.rot += 0.08;
+      },
+
+      jump() {
+        if (this.jumpsLeft > 0) {
+          this.velY = JUMP_FORCE;
+          this.jumpsLeft--;
+        }
+      },
+
+      draw() {
+        ctx.save();
+        ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+        ctx.rotate(this.rot);
+
+        // Glow
+        ctx.shadowColor = '#ff4d6d';
+        ctx.shadowBlur = 12;
+
+        // Main block
+        ctx.fillStyle = '#ff4d6d';
+        ctx.fillRect(-this.w/2, -this.h/2, this.w, this.h);
+
+        // Inner detail
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-this.w/2 + 6, -this.h/2 + 6, this.w - 12, this.h - 12);
+
+        ctx.restore();
+      }
+    };
+
+    // ---- Obstacles ----
+    let obstacles = [];
+
+    function spawnObstacle() {
+      const pick = Math.random();
+      const spd  = GAME_SPEED + score / 2000; // subtle speed ramp
+
+      if (pick < 0.4) {
+        // Single spike
+        obstacles.push({ x: canvas.width + 10, y: GROUND_Y - 42, w: 32, h: 42, spd });
+      } else if (pick < 0.7) {
+        // Double spike
+        obstacles.push({ x: canvas.width + 10, y: GROUND_Y - 42, w: 32, h: 42, spd });
+        obstacles.push({ x: canvas.width + 52, y: GROUND_Y - 42, w: 32, h: 42, spd });
+      } else {
+        // Tall spike
+        obstacles.push({ x: canvas.width + 10, y: GROUND_Y - 65, w: 34, h: 65, spd });
+      }
+    }
+
+    function drawObstacle(obs) {
+      ctx.save();
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#ffd700';
+      ctx.beginPath();
+      ctx.moveTo(obs.x,             obs.y + obs.h);
+      ctx.lineTo(obs.x + obs.w / 2, obs.y);
+      ctx.lineTo(obs.x + obs.w,     obs.y + obs.h);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#ff9800';
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // ---- Background ----
+    const stars = Array.from({ length: 70 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * (GROUND_Y - 10),
+      r: Math.random() * 1.4 + 0.4,
+      spd: Math.random() * 0.4 + 0.15
+    }));
+
+    function drawBg() {
+      // Sky
+      const g = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+      g.addColorStop(0, '#06061a');
+      g.addColorStop(1, '#1a1040');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, canvas.width, GROUND_Y);
+
+      // Stars
+      stars.forEach(s => {
+        s.x -= s.spd;
+        if (s.x < 0) s.x = canvas.width;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        ctx.fill();
+      });
+
+      // Ground block
+      ctx.fillStyle = '#13113a';
+      ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
+
+      // Ground edge glow
+      ctx.fillStyle = '#3d2fa0';
+      ctx.fillRect(0, GROUND_Y, canvas.width, 4);
+
+      // Ground grid lines
+      ctx.strokeStyle = 'rgba(60,50,160,0.5)';
+      ctx.lineWidth = 1;
+      const offset = (frames * GAME_SPEED) % 50;
+      for (let x = -offset; x < canvas.width; x += 50) {
+        ctx.beginPath(); ctx.moveTo(x, GROUND_Y + 4); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = GROUND_Y + 18; y < canvas.height; y += 18) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+    }
+
+    // ---- Collision ----
+    function checkCollision() {
+      for (const obs of obstacles) {
+        const px = player.x + 6, py = player.y + 6;
+        const pw = player.w - 12, ph = player.h - 12;
+        if (px + pw < obs.x || px > obs.x + obs.w) continue;
+        if (py + ph < obs.y || py > obs.y + obs.h) continue;
+        // Triangle approximation
+        const cx = px + pw / 2;
+        const cy = py + ph / 2;
+        const mid = obs.x + obs.w / 2;
+        const slope = obs.h / (obs.w / 2);
+        const triH = obs.h - Math.abs(cx - mid) * slope;
+        if (triH > 0 && cy > obs.y + obs.h - triH) return true;
+      }
+      return false;
+    }
+
+    // ---- Overlay Text ----
+    function drawOverlay(line1, line2, color1 = '#ff4d6d', color2 = '#ffd700') {
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = color1;
+      ctx.font = 'bold 22px "Press Start 2P", monospace';
+      ctx.fillText(line1, canvas.width / 2, canvas.height / 2 - 18);
+      if (line2) {
+        ctx.fillStyle = color2;
+        ctx.font = '9px "Press Start 2P", monospace';
+        ctx.fillText(line2, canvas.width / 2, canvas.height / 2 + 16);
+      }
+    }
+
+    // ---- Game Loop ----
+    function reset() {
+      gameOver = false; started = false;
+      score = 0; frames = 0;
+      spawnTimer = 0; spawnInterval = 110;
+      obstacles = [];
+      player.reset();
+    }
+
+    function gameLoop() {
+      frames++;
+      drawBg();
+
+      if (!started) {
+        player.draw();
+        drawOverlay('BLOCK DASH', 'SPACE or CLICK to start!', '#ff4d6d', '#aad4ff');
+        requestAnimationFrame(gameLoop);
+        return;
+      }
+
+      if (gameOver) {
+        player.draw();
+        obstacles.forEach(drawObstacle);
+        drawOverlay('GAME OVER', 'Score: ' + score + '  —  SPACE or CLICK to retry', '#ff4d6d', '#ffd700');
+        requestAnimationFrame(gameLoop);
+        return;
+      }
+
+      // Spawn
+      spawnTimer++;
+      if (spawnTimer >= spawnInterval) {
+        spawnObstacle();
+        spawnTimer = 0;
+        spawnInterval = Math.max(55, spawnInterval - 0.8);
+      }
+
+      // Update obstacles
+      obstacles.forEach(obs => { obs.x -= obs.spd; });
+      obstacles = obstacles.filter(obs => obs.x + obs.w > 0);
+
+      player.update();
+      obstacles.forEach(drawObstacle);
+      player.draw();
+
+      if (checkCollision()) {
+        gameOver = true;
+        if (score > bestScore) {
+          bestScore = score;
+          bestEl.textContent = bestScore;
+        }
+      }
+
+      score++;
+      scoreEl.textContent = score;
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // ---- Input ----
+    function handleInput() {
+      if (!started)       { started = true; return; }
+      if (gameOver)       { reset(); return; }
+      player.jump();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space') { e.preventDefault(); handleInput(); }
+    });
+    canvas.addEventListener('click', handleInput);
+
+    // Kick it off
+    gameLoop();
+  </script>
+</body>
+</html>
