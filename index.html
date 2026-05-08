@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Block Dash</title>
+  <title>Block Dash — Teacher Reference</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
@@ -162,14 +162,14 @@
 
       if (pick < 0.4) {
         // Single spike
-        obstacles.push({ x: canvas.width + 10, y: GROUND_Y - 42, w: 32, h: 42, spd });
+        obstacles.push({ x: canvas.width + 10, y: GROUND_Y - 75, w: 32, h: 75, spd });
       } else if (pick < 0.7) {
         // Double spike
-        obstacles.push({ x: canvas.width + 10, y: GROUND_Y - 42, w: 32, h: 42, spd });
-        obstacles.push({ x: canvas.width + 52, y: GROUND_Y - 42, w: 32, h: 42, spd });
+        obstacles.push({ x: canvas.width + 10, y: GROUND_Y - 75, w: 32, h: 75, spd });
+        obstacles.push({ x: canvas.width + 52, y: GROUND_Y - 75, w: 32, h: 75, spd });
       } else {
         // Tall spike
-        obstacles.push({ x: canvas.width + 10, y: GROUND_Y - 65, w: 34, h: 65, spd });
+        obstacles.push({ x: canvas.width + 10, y: GROUND_Y - 105, w: 34, h: 105, spd });
       }
     }
 
